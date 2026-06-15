@@ -1,0 +1,49 @@
+package rprocessor
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/Lagwick/order-service/internal/app/config/section"
+	rhandler "github.com/Lagwick/order-service/internal/app/handler/http"
+)
+
+type httpProc struct {
+	server http.Server
+	addr   string
+}
+
+func NewHTTP(hHealth rhandler.Health, cfg section.ProcessorWebServer) *httpProc {
+	gin.SetMode(gin.ReleaseMode)
+
+	router := gin.New()
+	router.Use(gin.Recovery())
+
+	router.NoRoute(handleNotFound)
+
+	vGenericRegHealthCheck(router, hHealth)
+
+	for _, route := range router.Routes() {
+		log.Printf("HTTP route registered: %s %s", route.Method, route.Path)
+	}
+
+	addr := fmt.Sprintf(":%d", cfg.ListenPort)
+
+	server := http.Server{
+		Addr:    addr,
+		Handler: router,
+	}
+
+	return &httpProc{
+		server: server,
+		addr:   addr,
+	}
+}
+
+func (p *httpProc) Serve() error {
+	log.Printf("Starting HTTP server on %s", p.addr)
+	return p.server.ListenAndServe()
+}
