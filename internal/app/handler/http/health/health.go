@@ -3,8 +3,9 @@ package rhealth
 import (
 	"net/http"
 
-	rhandler "github.com/Lagwick/order-service/internal/app/handler/http"
 	"github.com/gin-gonic/gin"
+
+	rhandler "github.com/Lagwick/order-service/internal/app/handler/http"
 )
 
 type handler struct{}

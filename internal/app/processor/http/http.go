@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -12,7 +13,7 @@ import (
 )
 
 type httpProc struct {
-	server http.Server
+	server *http.Server
 	addr   string
 }
 
@@ -32,9 +33,10 @@ func NewHTTP(hHealth rhandler.Health, cfg section.ProcessorWebServer) *httpProc 
 
 	addr := fmt.Sprintf(":%d", cfg.ListenPort)
 
-	server := http.Server{
-		Addr:    addr,
-		Handler: router,
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	return &httpProc{

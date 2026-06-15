@@ -20,12 +20,16 @@ func main() {
 		log.Fatalf("connect postgres: %v", err)
 	}
 	log.Printf("Postgres connection established")
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			log.Printf("close postgres connection: %v", err)
+		}
+	}()
 	healthHandler := rhealth.NewHandler()
 	httpProc := rprocessor.NewHTTP(healthHandler, cfg.Processor.WebServer)
 
 	if err := httpProc.Serve(); err != nil {
-		log.Fatalf("serve http: %v", err)
+		log.Printf("serve http: %v", err)
+		return
 	}
-
 }

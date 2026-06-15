@@ -1,11 +1,12 @@
 package config
 
 import (
-	"github.com/Lagwick/order-service/internal/app/config/section"
+	"log"
+
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 
-	"log"
+	"github.com/Lagwick/order-service/internal/app/config/section"
 )
 
 type Config struct {
