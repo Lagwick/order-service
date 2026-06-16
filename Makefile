@@ -32,11 +32,15 @@ test: ## Запуск тестов
 # =============================================================================
 .PHONY: lint
 lint: ## Запуск линтера
-	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${GO_LINT_VERSION} run
+	GOPROXY=direct GOSUMDB=off go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.2 run --timeout=10m --config=./.golangci.yml
+
+.PHONY: fmt
+fmt: ## Форматирование
+    	GOPROXY=direct GOSUMDB=off go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.2 fmt --config=./.golangci.yml
 
 .PHONY: lint-fix
 lint-fix: ## Запуск линтера с автофиксом
-	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${GO_LINT_VERSION} run --fix
+	GOPROXY=direct GOSUMDB=off go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${GO_LINT_VERSION} run --fix --timeout=10m --config=./.golangci.yml
 
 # =============================================================================
 # Окружение (Docker)
