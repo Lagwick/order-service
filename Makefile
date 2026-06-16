@@ -1,9 +1,12 @@
 # =============================================================================
 # Переменные
 # =============================================================================
+-include .env
 OUTPUT := ./bin/app
 GO_LINT_VERSION := 2.7.2
 GO_FILE := ./main.go
+MIGRATION_DIR := ./migration/postgres
+MIGRATION_DSN := postgres://$(APP_REPOSITORY_POSTGRES_USERNAME):$(APP_REPOSITORY_POSTGRES_PASSWORD)@$(APP_REPOSITORY_POSTGRES_ADDRESS)/$(APP_REPOSITORY_POSTGRES_NAME)?sslmode=disable
 
 # =============================================================================
 # Справка
@@ -28,6 +31,20 @@ test: ## Запуск тестов
 	go test -count=1 -v ./...
 
 # =============================================================================
+# Миграции
+# =============================================================================
+.PHONY: migrate-up
+migrate-up: ## применить все миграции
+	migrate -database "$(MIGRATION_DSN)" -path $(MIGRATION_DIR) up
+
+.PHONY: migrate-down
+migrate-down: ## откатить все миграции
+	migrate -database "$(MIGRATION_DSN)" -path $(MIGRATION_DIR) down -all
+
+.PHONY: migrate-create
+migrate-create: ## создать новую пару миграций (NAME=имя)
+	migrate create -ext sql -dir $(MIGRATION_DIR) -seq $(NAME)
+# =============================================================================
 # Качество кода
 # =============================================================================
 .PHONY: lint
@@ -36,7 +53,7 @@ lint: ## Запуск линтера
 
 .PHONY: fmt
 fmt: ## Форматирование
-    	GOPROXY=direct GOSUMDB=off go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.2 fmt --config=./.golangci.yml
+	GOPROXY=direct GOSUMDB=off go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${GO_LINT_VERSION} fmt --config=./.golangci.yml
 
 .PHONY: lint-fix
 lint-fix: ## Запуск линтера с автофиксом
