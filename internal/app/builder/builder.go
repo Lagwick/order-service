@@ -15,9 +15,14 @@ import (
 	"github.com/Lagwick/order-service/internal/app/config"
 	rhandler "github.com/Lagwick/order-service/internal/app/handler/http"
 	rhealth "github.com/Lagwick/order-service/internal/app/handler/http/health"
+	horder "github.com/Lagwick/order-service/internal/app/handler/http/order"
 	"github.com/Lagwick/order-service/internal/app/processor"
 	rprocessor "github.com/Lagwick/order-service/internal/app/processor/http"
+	"github.com/Lagwick/order-service/internal/app/repository"
 	rcpostgres "github.com/Lagwick/order-service/internal/app/repository/conn/postgres"
+	porder "github.com/Lagwick/order-service/internal/app/repository/order"
+	"github.com/Lagwick/order-service/internal/app/service"
+	sorder "github.com/Lagwick/order-service/internal/app/service/order"
 )
 
 type Builder struct {
@@ -30,8 +35,14 @@ type Builder struct {
 
 	chErrors chan error
 
-	connPostgres  *rcpostgres.Client
+	connPostgres *rcpostgres.Client
+
+	orderRepo repository.Order
+
+	orderService service.Order
+
 	healthHandler rhandler.Health
+	orderHandler  rhandler.Order
 
 	processors []processor.Processor
 }
@@ -59,7 +70,7 @@ func NewBuilder(cCtx *cli.Context) *Builder {
 }
 
 func (b *Builder) BuildConfig() {
-	b.exec(true, func(b *Builder) {
+	b.exec(func(b *Builder) {
 		b.buildConfig()
 	})
 }
@@ -86,7 +97,7 @@ func (b *Builder) Run() {
 ////////////////////////////////////////////////////////////////////////////////
 
 func (b *Builder) BuildRepoConnPostgres() {
-	b.exec(true, func(b *Builder) {
+	b.exec(func(b *Builder) {
 		client, err := rcpostgres.NewClient(b.ctx, b.cfg.Repository.Postgres)
 		if err != nil {
 			b.err = err
@@ -124,8 +135,8 @@ func (b *Builder) buildConfig() {
 	b.cfg = config.Root
 }
 
-func (b *Builder) exec(preCond bool, cb func(b *Builder), requiredArgs ...any) {
-	if !preCond || b.err != nil || b.ctx.Err() != nil {
+func (b *Builder) exec(cb func(b *Builder), requiredArgs ...any) {
+	if b.err != nil || b.ctx.Err() != nil {
 		return
 	}
 
@@ -150,12 +161,43 @@ func (b *Builder) exec(preCond bool, cb func(b *Builder), requiredArgs ...any) {
 ////////////////////////////////////////////////////////////////////////////////
 
 func (b *Builder) BuildProcHttp() {
-	b.exec(true, func(b *Builder) {
+	b.exec(func(b *Builder) {
 		proc := rprocessor.NewHTTP(
 			b.healthHandler,
+			b.orderHandler,
 			b.cfg.Processor.WebServer,
 		)
 
 		b.processors = append(b.processors, proc)
-	}, b.healthHandler)
+	}, b.healthHandler, b.orderHandler)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///// REPOSITORIES /////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+func (b *Builder) BuildRepoOrder() {
+	b.exec(func(b *Builder) {
+		b.orderRepo = porder.NewRepo(b.connPostgres)
+	}, b.connPostgres)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///// SERVICES /////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+func (b *Builder) BuildServiceOrder() {
+	b.exec(func(b *Builder) {
+		b.orderService = sorder.NewService(b.orderRepo)
+	}, b.orderRepo)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///// HANDLERS /////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+func (b *Builder) BuildHandlerOrder() {
+	b.exec(func(b *Builder) {
+		b.orderHandler = horder.NewHandler(b.orderService)
+	}, b.orderService)
 }
