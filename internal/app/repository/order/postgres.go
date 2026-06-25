@@ -68,7 +68,12 @@ func (r *repoPg) Delete(ctx context.Context, guid uuid.UUID) error {
 func (r *repoPg) Update(ctx context.Context, order entity.Order) error {
 	db := r.conn.GetDB(ctx)
 
-	result := db.Model(&entity.Order{}).Where("guid = ?", order.GUID).Updates(map[string]any{"status": order.Status})
+	result := db.Model(&entity.Order{}).
+		Where("guid = ?", order.GUID).
+		Updates(map[string]any{
+			"status":     order.Status,
+			"updated_at": order.UpdatedAt,
+		})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -98,5 +103,3 @@ func (r *repoPg) List(ctx context.Context, status *string, userGUID *uuid.UUID) 
 
 	return orders, nil
 }
-
-// TODO: Реализуйте Update, Delete, List.

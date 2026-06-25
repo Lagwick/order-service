@@ -88,6 +88,7 @@ func (s *srv) Update(
 		}
 
 		order.Status = req.Status
+		order.UpdatedAt = time.Now()
 
 		if err := s.repoOrder.Update(ctx, order); err != nil {
 			return err
@@ -101,5 +102,3 @@ func (s *srv) Update(
 
 	return order, nil
 }
-
-// TODO: Реализуйте GetByGUID, Update, Delete, List.
