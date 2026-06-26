@@ -26,6 +26,7 @@ func NewAppError(err error, httpStatus int) AppError {
 }
 
 var (
-	ErrNotFound      = NewAppError(errors.New("not found"), http.StatusNotFound)
-	ErrAlreadyExists = NewAppError(errors.New("already exists"), http.StatusConflict)
+	ErrNotFound            = NewAppError(errors.New("not found"), http.StatusNotFound)
+	ErrAlreadyExists       = NewAppError(errors.New("already exists"), http.StatusConflict)
+	ErrIncorrectParameters = NewAppError(errors.New("incorrect parameters"), http.StatusBadRequest)
 )
