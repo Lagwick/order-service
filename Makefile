@@ -107,3 +107,9 @@ ci: ## Запустить все CI проверки
 	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${GO_LINT_VERSION} run --timeout=10m
 	@echo ""
 	@echo "CI passed!"
+# =============================================================================
+# generate-proto
+# =============================================================================
+.PHONY: generate-proto
+generate-proto: ## Сгенерировать Go-код из .proto (buf)
+	buf generate
