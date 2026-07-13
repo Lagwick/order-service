@@ -35,11 +35,7 @@ func NewClient(address string) (ccatalog.Client, *grpc.ClientConn, error) {
 
 func (c *client) Ping(ctx context.Context) error {
 	_, err := c.raw.GetProducts(ctx, &catalogv1.GetProductsRequest{})
-	if err != nil {
-		return normalizeError(err)
-	}
-
-	return nil
+	return err
 }
 
 func (c *client) GetProduct(

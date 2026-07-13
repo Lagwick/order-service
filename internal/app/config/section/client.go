@@ -5,5 +5,5 @@ type Client struct {
 }
 
 type Catalog struct {
-	Address string `env:"ADDRESS" envDefault:"localhost:50051"`
+	GrpcAddress string `split_words:"true"`
 }

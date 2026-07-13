@@ -86,13 +86,20 @@ func (b *Builder) Run() {
 		log.Info().Msg("Shutdown during initialization")
 		return
 	}
+
 	if b.err != nil {
 		log.Fatal().Err(b.err).Msg("Failed to initialize application")
 	}
+
 	log.Info().Msg("Application initialized")
 	defer log.Info().Msg("Application completed")
+
 	for _, proc := range b.processors {
 		proc.StartAsync(b.ctx, &b.wg)
+	}
+
+	if b.catalogGrpcConn != nil {
+		processor.WatchForShutdown(b.ctx, &b.wg, b.catalogGrpcConn)
 	}
 
 	b.wg.Wait()
@@ -168,7 +175,7 @@ func (b *Builder) exec(cb func(b *Builder), requiredArgs ...any) {
 
 func (b *Builder) BuildClientGrpcCatalogV1() {
 	b.exec(func(b *Builder) {
-		client, conn, err := cgrpc.NewClient(b.cfg.Client.Catalog.Address)
+		client, conn, err := cgrpc.NewClient(b.cfg.Client.Catalog.GrpcAddress)
 		if err != nil {
 			b.err = err
 			return
