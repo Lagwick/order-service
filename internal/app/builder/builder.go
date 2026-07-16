@@ -11,7 +11,10 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
+	"google.golang.org/grpc"
 
+	ccatalog "github.com/Lagwick/order-service/internal/app/client/catalog"
+	cgrpc "github.com/Lagwick/order-service/internal/app/client/catalog/grpc"
 	"github.com/Lagwick/order-service/internal/app/config"
 	rhandler "github.com/Lagwick/order-service/internal/app/handler/http"
 	rhealth "github.com/Lagwick/order-service/internal/app/handler/http/health"
@@ -43,6 +46,9 @@ type Builder struct {
 
 	healthHandler rhandler.Health
 	orderHandler  rhandler.Order
+
+	catalogV1Client ccatalog.Client
+	catalogGrpcConn *grpc.ClientConn
 
 	processors []processor.Processor
 }
@@ -80,13 +86,20 @@ func (b *Builder) Run() {
 		log.Info().Msg("Shutdown during initialization")
 		return
 	}
+
 	if b.err != nil {
 		log.Fatal().Err(b.err).Msg("Failed to initialize application")
 	}
+
 	log.Info().Msg("Application initialized")
 	defer log.Info().Msg("Application completed")
+
 	for _, proc := range b.processors {
 		proc.StartAsync(b.ctx, &b.wg)
+	}
+
+	if b.catalogGrpcConn != nil {
+		processor.WatchForShutdown(b.ctx, &b.wg, b.catalogGrpcConn)
 	}
 
 	b.wg.Wait()
@@ -157,6 +170,29 @@ func (b *Builder) exec(cb func(b *Builder), requiredArgs ...any) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+///// CLIENTS ///////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+func (b *Builder) BuildClientGrpcCatalogV1() {
+	b.exec(func(b *Builder) {
+		client, conn, err := cgrpc.NewClient(b.cfg.Client.Catalog.GrpcAddress)
+		if err != nil {
+			b.err = err
+			return
+		}
+
+		if err = client.Ping(b.ctx); err != nil {
+			_ = conn.Close()
+			b.err = err
+			return
+		}
+
+		b.catalogV1Client = client
+		b.catalogGrpcConn = conn
+	})
+}
+
+////////////////////////////////////////////////////////////////////////////////
 ///// PROCESSORS ///////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -188,8 +224,8 @@ func (b *Builder) BuildRepoOrder() {
 
 func (b *Builder) BuildServiceOrder() {
 	b.exec(func(b *Builder) {
-		b.orderService = sorder.NewService(b.orderRepo)
-	}, b.orderRepo)
+		b.orderService = sorder.NewService(b.orderRepo, b.catalogV1Client)
+	}, b.orderRepo, b.catalogV1Client)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

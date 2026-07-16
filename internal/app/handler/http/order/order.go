@@ -165,5 +165,3 @@ func (h *handler) List(c *gin.Context) {
 
 	httph.SendJSON(c.Writer, http.StatusOK, resp)
 }
-
-// TODO: Реализуйте GetByGUID, Update, Delete, List.

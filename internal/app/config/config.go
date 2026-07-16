@@ -28,6 +28,7 @@ func createLogger(level zerolog.Level, output io.Writer) zerolog.Logger {
 type Config struct {
 	Repository section.Repository `split_words:"true"`
 	Processor  section.Processor  `split_words:"true"`
+	Client     section.Client     `split_words:"true"`
 	Monitor    section.Monitor    `split_words:"true"`
 }
 
