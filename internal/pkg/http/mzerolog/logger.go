@@ -22,12 +22,16 @@ type middleware struct {
 
 func (m *middleware) Callback(c *gin.Context) {
 	start := time.Now()
+
 	c.Next()
+
 	r := c.Request
 	err := httph.ErrorGet(r)
+
 	if m.fromOptions.skipper(r) {
 		return
 	}
+
 	var builder strings.Builder
 	builder.Grow(48 + len(r.RequestURI))
 
@@ -49,6 +53,10 @@ func (m *middleware) Callback(c *gin.Context) {
 	event = event.
 		Dur("exec_time", time.Since(start)).
 		Str("client_ip", c.ClientIP())
+
+	if status := httph.ErrorGetStatusCode(r); status > 0 {
+		event = event.Int("http_status_code", status)
+	}
 
 	if ctxErr := r.Context().Err(); ctxErr != nil {
 		event = event.Err(ctxErr)
