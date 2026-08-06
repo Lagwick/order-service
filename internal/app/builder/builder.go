@@ -16,11 +16,13 @@ import (
 	ccatalog "github.com/Lagwick/order-service/internal/app/client/catalog"
 	cgrpc "github.com/Lagwick/order-service/internal/app/client/catalog/grpc"
 	"github.com/Lagwick/order-service/internal/app/config"
+	"github.com/Lagwick/order-service/internal/app/constant"
 	rhandler "github.com/Lagwick/order-service/internal/app/handler/http"
 	rhealth "github.com/Lagwick/order-service/internal/app/handler/http/health"
 	horder "github.com/Lagwick/order-service/internal/app/handler/http/order"
 	"github.com/Lagwick/order-service/internal/app/processor"
 	rprocessor "github.com/Lagwick/order-service/internal/app/processor/http"
+	mmonitor "github.com/Lagwick/order-service/internal/app/processor/monitor"
 	"github.com/Lagwick/order-service/internal/app/repository"
 	rcpostgres "github.com/Lagwick/order-service/internal/app/repository/conn/postgres"
 	porder "github.com/Lagwick/order-service/internal/app/repository/order"
@@ -50,7 +52,8 @@ type Builder struct {
 	catalogV1Client ccatalog.Client
 	catalogGrpcConn *grpc.ClientConn
 
-	processors []processor.Processor
+	processors      []processor.Processor
+	otelServiceName string
 }
 
 func NewBuilder(cCtx *cli.Context) *Builder {
@@ -193,12 +196,40 @@ func (b *Builder) BuildClientGrpcCatalogV1() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+///// MONITORING ///////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+func (b *Builder) BuildMonitorOpenTelemetry() {
+	cfg := b.cfg.Monitor.OpenTelemetry
+	if !cfg.Enabled {
+		log.Warn().Msg("OpenTelemetry is disabled by config")
+		return
+	}
+
+	b.exec(func(b *Builder) {
+		proc, err := mmonitor.NewOpenTelemetryController(
+			b.ctx,
+			b.cfg.Monitor.Environment,
+			cfg,
+		)
+		if err != nil {
+			b.err = fmt.Errorf("init OpenTelemetry: %w", err)
+			return
+		}
+
+		b.processors = append(b.processors, proc)
+		b.otelServiceName = constant.AppName
+	})
+}
+
+////////////////////////////////////////////////////////////////////////////////
 ///// PROCESSORS ///////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
 func (b *Builder) BuildProcHttp() {
 	b.exec(func(b *Builder) {
 		proc := rprocessor.NewHTTP(
+			b.otelServiceName,
 			b.healthHandler,
 			b.orderHandler,
 			b.cfg.Processor.WebServer,
