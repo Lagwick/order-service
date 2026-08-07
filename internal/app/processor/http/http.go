@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
 	"github.com/Lagwick/order-service/internal/app/config/section"
 	rhandler "github.com/Lagwick/order-service/internal/app/handler/http"
@@ -26,6 +27,7 @@ type httpProc struct {
 }
 
 func NewHTTP(
+	otelServiceName string,
 	hHealth rhandler.Health,
 	hOrder rhandler.Order,
 	cfg section.ProcessorWebServer,
@@ -34,11 +36,24 @@ func NewHTTP(
 
 	router := gin.New()
 
-	router.Use(adaptRequestMiddleware(httph.NewErrorMiddleware()))
-	router.Use(mzerolog.NewMiddleware(
-		mzerolog.WithSkipper(util.IsFilteredHttpRoute),
-	))
-	router.Use(gin.Recovery())
+	if otelServiceName != "" {
+		router.Use(
+			otelgin.Middleware(
+				otelServiceName,
+				otelgin.WithFilter(func(r *http.Request) bool {
+					return !util.IsFilteredHttpRoute(r)
+				}),
+			),
+		)
+	}
+
+	router.Use(
+		adaptRequestMiddleware(httph.NewErrorMiddleware()),
+		mzerolog.NewMiddleware(
+			mzerolog.WithSkipper(util.IsFilteredHttpRoute),
+		),
+		gin.Recovery(),
+	)
 
 	router.NoRoute(handleNotFound)
 	vGenericRegHealthCheck(router, hHealth)
