@@ -2,9 +2,11 @@ package rcpostgres
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"time"
 
+	"github.com/uptrace/opentelemetry-go-extra/otelgorm"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -37,7 +39,11 @@ func NewClient(ctx context.Context, cfg section.RepositoryPostgres) (*Client, er
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("gorm.Open: %w", err)
+	}
+
+	if err := db.Use(otelgorm.NewPlugin(otelgorm.WithDBName(cfg.Name))); err != nil {
+		return nil, fmt.Errorf("otelgorm plugin: %w", err)
 	}
 	sqlDB, err := db.DB()
 	if err != nil {

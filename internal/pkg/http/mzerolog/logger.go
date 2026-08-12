@@ -45,9 +45,11 @@ func (m *middleware) Callback(c *gin.Context) {
 		builder.WriteString(" finished with no error")
 	}
 
-	event := m.log.Debug()
+	event := m.log.Debug().Ctx(r.Context())
 	if err != nil {
-		event = m.log.Error().Err(err)
+		event = m.log.Error().
+			Err(err).
+			Ctx(r.Context())
 	}
 
 	event = event.
