@@ -4,7 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/Lagwick/order-service/internal/pkg/broker"
 	"github.com/gofrs/uuid"
+	"github.com/rs/zerolog/log"
 
 	ccatalog "github.com/Lagwick/order-service/internal/app/client/catalog"
 	"github.com/Lagwick/order-service/internal/app/entity"
@@ -14,14 +16,16 @@ import (
 )
 
 type srv struct {
-	repoOrder   repository.Order
-	catalogGrpc ccatalog.Client
+	repoOrder       repository.Order
+	catalogGrpc     ccatalog.Client
+	busOrderCreated broker.Bus[entity.EventOrderCreated]
 }
 
-func NewService(repoOrder repository.Order, catalogGrpc ccatalog.Client) service.Order {
+func NewService(repoOrder repository.Order, catalogGrpc ccatalog.Client, busOrderCreated broker.Bus[entity.EventOrderCreated]) service.Order {
 	return &srv{
-		repoOrder:   repoOrder,
-		catalogGrpc: catalogGrpc,
+		repoOrder:       repoOrder,
+		catalogGrpc:     catalogGrpc,
+		busOrderCreated: busOrderCreated,
 	}
 }
 
@@ -90,6 +94,40 @@ func (s *srv) Create(ctx context.Context, req entity.RequestOrderCreate) (entity
 
 	if err := s.repoOrder.Create(ctx, order); err != nil {
 		return entity.Order{}, err
+	}
+
+	eventItems := make([]entity.EventOrderCreatedItem, 0, len(order.Items))
+	for _, item := range order.Items {
+		eventItems = append(eventItems, entity.EventOrderCreatedItem{
+			ProductGUID: item.ProductGUID.String(),
+			Quantity:    item.Quantity,
+			UnitPrice:   item.UnitPrice,
+		})
+	}
+
+	ev := entity.EventOrderCreated{
+		OrderGUID:  order.GUID.String(),
+		Currency:   order.Currency,
+		TotalPrice: order.TotalPrice,
+		CreatedAt:  order.CreatedAt.UTC().Format(time.RFC3339),
+		Items:      eventItems,
+	}
+
+	if order.UserGUID != nil {
+		userGUID := order.UserGUID.String()
+		ev.UserGUID = &userGUID
+	}
+
+	if err := s.busOrderCreated.Send(
+		ctx,
+		&ev,
+		entity.BrokerHeaderOrderCreatedType(),
+		entity.BrokerHeaderOrderCreatedEventID(),
+	); err != nil {
+		log.Error().
+			Err(err).
+			EmbedObject(ev).
+			Msg("failed to publish order created event")
 	}
 
 	return order, nil

@@ -34,6 +34,7 @@ type Config struct {
 	Processor  section.Processor  `split_words:"true"`
 	Client     section.Client     `split_words:"true"`
 	Monitor    section.Monitor    `split_words:"true"`
+	Broker     section.Broker     `split_words:"true"`
 }
 
 var Root Config
