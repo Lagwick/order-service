@@ -49,13 +49,14 @@ func (h *handler) Create(c *gin.Context) {
 	}
 
 	resp := entity.ResponseOrderCreate{
-		GUID:       order.GUID,
-		UserGUID:   order.UserGUID,
-		TotalPrice: order.TotalPrice,
-		Currency:   order.Currency,
-		Status:     order.Status,
-		Items:      toResponseOrderItems(order.Items),
-		CreatedAt:  order.CreatedAt,
+		GUID:          order.GUID,
+		UserGUID:      order.UserGUID,
+		TotalPrice:    order.TotalPrice,
+		DeliveryPrice: order.DeliveryPrice,
+		Currency:      order.Currency,
+		Status:        order.Status,
+		Items:         toResponseOrderItems(order.Items),
+		CreatedAt:     order.CreatedAt,
 	}
 
 	httph.SendJSON(c.Writer, http.StatusCreated, resp)
@@ -75,14 +76,15 @@ func (h *handler) GetByGUID(c *gin.Context) {
 	}
 
 	resp := entity.ResponseOrderGet{
-		GUID:       order.GUID,
-		UserGUID:   order.UserGUID,
-		TotalPrice: order.TotalPrice,
-		Currency:   order.Currency,
-		Status:     order.Status,
-		Items:      toResponseOrderItems(order.Items),
-		CreatedAt:  order.CreatedAt,
-		UpdatedAt:  order.UpdatedAt,
+		GUID:          order.GUID,
+		UserGUID:      order.UserGUID,
+		TotalPrice:    order.TotalPrice,
+		DeliveryPrice: order.DeliveryPrice,
+		Currency:      order.Currency,
+		Status:        order.Status,
+		Items:         toResponseOrderItems(order.Items),
+		CreatedAt:     order.CreatedAt,
+		UpdatedAt:     order.UpdatedAt,
 	}
 
 	httph.SendJSON(c.Writer, http.StatusOK, resp)
@@ -123,9 +125,10 @@ func (h *handler) Update(c *gin.Context) {
 	}
 
 	resp := entity.ResponseOrderUpdate{
-		GUID:      order.GUID,
-		Status:    order.Status,
-		UpdatedAt: order.UpdatedAt,
+		GUID:          order.GUID,
+		Status:        order.Status,
+		DeliveryPrice: order.DeliveryPrice,
+		UpdatedAt:     order.UpdatedAt,
 	}
 
 	httph.SendJSON(c.Writer, http.StatusOK, resp)
