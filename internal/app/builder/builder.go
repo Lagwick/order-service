@@ -18,10 +18,13 @@ import (
 	"github.com/Lagwick/order-service/internal/app/config"
 	"github.com/Lagwick/order-service/internal/app/constant"
 	"github.com/Lagwick/order-service/internal/app/entity"
+	ehandler "github.com/Lagwick/order-service/internal/app/handler/event"
+	ehorder "github.com/Lagwick/order-service/internal/app/handler/event/order"
 	rhandler "github.com/Lagwick/order-service/internal/app/handler/http"
 	rhealth "github.com/Lagwick/order-service/internal/app/handler/http/health"
 	horder "github.com/Lagwick/order-service/internal/app/handler/http/order"
 	"github.com/Lagwick/order-service/internal/app/processor"
+	eprocessor "github.com/Lagwick/order-service/internal/app/processor/event"
 	rprocessor "github.com/Lagwick/order-service/internal/app/processor/http"
 	mmonitor "github.com/Lagwick/order-service/internal/app/processor/monitor"
 	"github.com/Lagwick/order-service/internal/app/repository"
@@ -34,14 +37,15 @@ import (
 )
 
 type Builder struct {
-	cCtx            *cli.Context
-	ctx             context.Context
-	wg              sync.WaitGroup
-	err             error
-	cfg             config.Config
-	cancelFunc      context.CancelFunc
-	kafkaClient     *broker.KafkaClient
-	busOrderCreated broker.Bus[entity.EventOrderCreated]
+	cCtx                       *cli.Context
+	ctx                        context.Context
+	wg                         sync.WaitGroup
+	err                        error
+	cfg                        config.Config
+	cancelFunc                 context.CancelFunc
+	kafkaClient                *broker.KafkaClient
+	busOrderCreated            broker.Bus[entity.EventOrderCreated]
+	busOrderDeliveryCalculated broker.Bus[entity.EventOrderDeliveryCalculated]
 
 	chErrors chan error
 
@@ -59,6 +63,9 @@ type Builder struct {
 
 	processors      []processor.Processor
 	otelServiceName string
+
+	orderDeliveryService service.OrderDelivery
+	orderDeliveryHandler ehandler.OrderDeliveryCalculated
 }
 
 func NewBuilder(cCtx *cli.Context) *Builder {
@@ -241,7 +248,7 @@ func (b *Builder) BuildProcHttp() {
 		)
 
 		b.processors = append(b.processors, proc)
-	}, b.healthHandler, b.orderHandler)
+	}, b.healthHandler)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -282,7 +289,7 @@ func (b *Builder) BuildHandlerOrder() {
 ///// KAFKA /////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-func (b *Builder) BuildBrokerKafka() {
+func (b *Builder) BuildBrokerKafkaClient() {
 	b.exec(func(b *Builder) {
 		cfg := b.cfg.Broker.Kafka
 
@@ -298,25 +305,6 @@ func (b *Builder) BuildBrokerKafka() {
 
 		b.kafkaClient = client
 
-		topic := cfg.ModelOrder.Created.Topic
-		group := broker.Coalesce(
-			cfg.ModelOrder.Created.ConsumerGroup,
-			cfg.ConsumerGroup,
-		)
-
-		bus, err := broker.NewBus[entity.EventOrderCreated](
-			client,
-			codec.NewCodecJson[entity.EventOrderCreated](),
-			topic,
-			group,
-		)
-		if err != nil {
-			b.err = fmt.Errorf("build order created kafka bus: %w", err)
-			return
-		}
-
-		b.busOrderCreated = bus
-
 		b.processors = append(
 			b.processors,
 			processor.ProcessorFunc(func(ctx context.Context, wg *sync.WaitGroup) {
@@ -328,4 +316,84 @@ func (b *Builder) BuildBrokerKafka() {
 			}),
 		)
 	})
+}
+
+func (b *Builder) BuildBusOrderCreated() {
+	b.exec(func(b *Builder) {
+		cfg := b.cfg.Broker.Kafka
+
+		topic := cfg.ModelOrder.Created.Topic
+		group := broker.Coalesce(
+			cfg.ModelOrder.Created.ConsumerGroup,
+			cfg.ConsumerGroup,
+		)
+
+		bus, err := broker.NewBus[entity.EventOrderCreated](
+			b.kafkaClient,
+			codec.NewCodecJson[entity.EventOrderCreated](),
+			topic,
+			group,
+		)
+		if err != nil {
+			b.err = fmt.Errorf("build order created kafka bus: %w", err)
+			return
+		}
+
+		b.busOrderCreated = bus
+	}, b.kafkaClient)
+}
+
+func (b *Builder) BuildBusOrderDeliveryCalculated() {
+	b.exec(func(b *Builder) {
+		cfg := b.cfg.Broker.Kafka
+
+		topic := cfg.ModelOrder.DeliveryCalculated.Topic
+		group := broker.Coalesce(
+			cfg.ModelOrder.DeliveryCalculated.ConsumerGroup,
+			cfg.ConsumerGroup,
+		)
+
+		bus, err := broker.NewBus[entity.EventOrderDeliveryCalculated](
+			b.kafkaClient,
+			codec.NewCodecJson[entity.EventOrderDeliveryCalculated](),
+			topic,
+			group,
+		)
+		if err != nil {
+			b.err = fmt.Errorf(
+				"build order delivery calculated kafka bus: %w",
+				err,
+			)
+			return
+		}
+
+		b.busOrderDeliveryCalculated = bus
+	}, b.kafkaClient)
+}
+
+func (b *Builder) BuildServiceOrderDelivery() {
+	b.exec(func(b *Builder) {
+		b.orderDeliveryService = sorder.NewDeliveryService(
+			b.orderRepo,
+		)
+	}, b.orderRepo)
+}
+
+func (b *Builder) BuildHandlerOrderDeliveryCalculated() {
+	b.exec(func(b *Builder) {
+		b.orderDeliveryHandler = ehorder.NewHandler(
+			b.orderDeliveryService,
+		)
+	}, b.orderDeliveryService)
+}
+
+func (b *Builder) BuildProcOrderDeliveryCalculated() {
+	b.exec(func(b *Builder) {
+		proc := eprocessor.NewOrderDeliveryCalculatedEventsCatcher(
+			b.orderDeliveryHandler,
+			b.busOrderDeliveryCalculated,
+		)
+
+		b.processors = append(b.processors, proc)
+	}, b.orderDeliveryHandler, b.busOrderDeliveryCalculated)
 }

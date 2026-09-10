@@ -103,3 +103,28 @@ func (r *repoPg) List(ctx context.Context, status *string, userGUID *uuid.UUID) 
 
 	return orders, nil
 }
+
+func (r *repoPg) ApplyDeliveryCalculated(
+	ctx context.Context,
+	guid uuid.UUID,
+	deliveryPrice int64,
+) (bool, error) {
+	db := r.conn.GetDB(ctx)
+
+	result := db.Model(&entity.Order{}).
+		Where(
+			"guid = ? AND status = ?",
+			guid,
+			entity.OrderStatusPending,
+		).
+		Updates(map[string]any{
+			"delivery_price": deliveryPrice,
+			"status":         entity.OrderStatusDeliveryCalculated,
+		})
+
+	if result.Error != nil {
+		return false, result.Error
+	}
+
+	return result.RowsAffected > 0, nil
+}

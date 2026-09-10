@@ -12,6 +12,9 @@ import (
 const (
 	tableNameOrder     = "orders"
 	tableNameOrderItem = "order_items"
+
+	OrderStatusPending            = "pending"
+	OrderStatusDeliveryCalculated = "delivery_calculated"
 )
 
 type Order struct {
@@ -131,6 +134,13 @@ type EventOrderCreatedItem struct {
 	ProductGUID string `json:"product_guid"`
 	Quantity    int    `json:"quantity"`
 	UnitPrice   int64  `json:"unit_price"`
+}
+
+type EventOrderDeliveryCalculated struct {
+	OrderGUID     string `json:"order_guid"`
+	DeliveryPrice int64  `json:"delivery_price"`
+	Currency      string `json:"currency"`
+	CalculatedAt  string `json:"calculated_at"`
 }
 
 func (e EventOrderCreated) EventId() string {
